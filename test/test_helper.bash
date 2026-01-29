@@ -26,7 +26,7 @@ P7MEXTRACT="${PROJECT_DIR}/p7mextract"
 
 # Load bats helper libraries
 # Support Apple Silicon (/opt/homebrew), Intel Macs (/usr/local), and Linux (npm global)
-if [[ -d "/opt/homebrew/lib" ]]; then
+if [[ -d "/opt/homebrew/lib/bats-support" ]]; then
     BATS_LIB_PATH="/opt/homebrew/lib"
 elif [[ -d "/usr/local/lib/bats-support" ]]; then
     BATS_LIB_PATH="/usr/local/lib"
@@ -36,6 +36,7 @@ else
     # npm global install location
     BATS_LIB_PATH="$(npm root -g 2>/dev/null)"
 fi
+export BATS_LIB_PATH
 
 load "${BATS_LIB_PATH}/bats-support/load"
 load "${BATS_LIB_PATH}/bats-assert/load"
