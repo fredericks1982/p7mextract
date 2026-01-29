@@ -17,35 +17,37 @@
 # p7mextract - Extract content from digitally signed .p7m files
 # Usage: p7mextract [input.p7m] [-o output.file]
 
+set -euo pipefail
+
 # Colors and formatting
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[0;33m'
-BLUE='\033[0;34m'
-BOLD='\033[1m'
-NC='\033[0m' # No Color
+readonly RED='\033[0;31m'
+readonly GREEN='\033[0;32m'
+readonly YELLOW='\033[0;33m'
+readonly BLUE='\033[0;34m'
+readonly BOLD='\033[1m'
+readonly NC='\033[0m' # No Color
 
 # Icons
-ICON_SUCCESS="✓"
-ICON_ERROR="✗"
-ICON_WARNING="⚠"
-ICON_PROMPT="❯"
+readonly ICON_SUCCESS="✓"
+readonly ICON_ERROR="✗"
+readonly ICON_WARNING="⚠"
+readonly ICON_PROMPT="❯"
 
 # Functions for colored output
 msg_success() {
-    echo -e "${GREEN}${ICON_SUCCESS}${NC} $1"
+    printf '%b %s\n' "${GREEN}${ICON_SUCCESS}${NC}" "$1"
 }
 
 msg_error() {
-    echo -e "${RED}${ICON_ERROR}${NC} $1" >&2
+    printf '%b %s\n' "${RED}${ICON_ERROR}${NC}" "$1" >&2
 }
 
 msg_warning() {
-    echo -e "${YELLOW}${ICON_WARNING}${NC} $1"
+    printf '%b %s\n' "${YELLOW}${ICON_WARNING}${NC}" "$1"
 }
 
 msg_prompt() {
-    echo -e -n "${BLUE}${ICON_PROMPT}${NC} $1"
+    printf '%b %s' "${BLUE}${ICON_PROMPT}${NC}" "$1"
 }
 
 # Show usage
@@ -128,9 +130,9 @@ get_human_size() {
     local file_size
     
     if [[ "$(uname)" == "Darwin" ]]; then
-        file_size=$(stat -f%z "$file" 2>/dev/null)
+        file_size=$(stat -f%z "$file" 2>/dev/null) || true
     else
-        file_size=$(stat -c%s "$file" 2>/dev/null)
+        file_size=$(stat -c%s "$file" 2>/dev/null) || true
     fi
     
     if [[ -z "$file_size" ]]; then
@@ -139,9 +141,13 @@ get_human_size() {
     fi
     
     if [[ $file_size -gt 1048576 ]]; then
-        echo "$(echo "scale=1; $file_size/1048576" | bc) MB"
+        local whole=$((file_size / 1048576))
+        local frac=$(( (file_size % 1048576) * 10 / 1048576 ))
+        echo "${whole}.${frac} MB"
     elif [[ $file_size -gt 1024 ]]; then
-        echo "$(echo "scale=1; $file_size/1024" | bc) KB"
+        local whole=$((file_size / 1024))
+        local frac=$(( (file_size % 1024) * 10 / 1024 ))
+        echo "${whole}.${frac} KB"
     else
         echo "${file_size} bytes"
     fi
@@ -153,29 +159,52 @@ extract_p7m() {
     local output_file="$2"
     local openssl_output_der
     local openssl_output_pem
-    
-    # Try DER format first (silently)
-    openssl_output_der=$(openssl smime -verify -noverify -in "$input_file" -inform DER -out "$output_file" 2>&1)
-    
-    if [[ $? -eq 0 ]]; then
+
+    # Write to a temp file first, then move on success to avoid corrupting existing files
+    local output_dir
+    output_dir="$(dirname "$output_file")"
+    local temp_file
+    temp_file="$(mktemp "${output_dir}/.p7mextract.XXXXXX")"
+
+    # Ensure temp file is cleaned up on unexpected exit
+    trap 'rm -f "$temp_file"' EXIT
+
+    # Detect likely PEM files to try the right format first
+    local first_format="DER"
+    local second_format="PEM"
+    if [[ "$(head -c 11 "$input_file")" == "-----BEGIN "* ]]; then
+        first_format="PEM"
+        second_format="DER"
+    fi
+
+    local openssl_output_first openssl_output_second
+
+    # Try first format (silently)
+    if openssl_output_first=$(openssl smime -verify -noverify -in "$input_file" -inform "$first_format" -out "$temp_file" 2>&1); then
+        mv -f "$temp_file" "$output_file"
+        trap - EXIT
         return 0
     fi
-    
-    # Fallback to PEM format (silently)
-    openssl_output_pem=$(openssl smime -verify -noverify -in "$input_file" -inform PEM -out "$output_file" 2>&1)
-    
-    if [[ $? -eq 0 ]]; then
+
+    # Fallback to second format (silently)
+    if openssl_output_second=$(openssl smime -verify -noverify -in "$input_file" -inform "$second_format" -out "$temp_file" 2>&1); then
+        mv -f "$temp_file" "$output_file"
+        trap - EXIT
         return 0
     fi
-    
-    # Both formats failed - show errors
+
+    # Both formats failed - show errors (sanitize output: strip control chars, truncate)
+    local sanitized_first sanitized_second
+    sanitized_first="$(printf '%s' "$openssl_output_first" | tr -d '[:cntrl:]' | head -c 500)"
+    sanitized_second="$(printf '%s' "$openssl_output_second" | tr -d '[:cntrl:]' | head -c 500)"
     msg_error "Failed to extract file"
-    msg_error "DER format error: ${openssl_output_der}"
-    msg_error "PEM format error: ${openssl_output_pem}"
-    
-    # Clean up partial output file if it exists
-    [[ -f "$output_file" ]] && rm -f "$output_file"
-    
+    msg_error "${first_format} format error: ${sanitized_first}"
+    msg_error "${second_format} format error: ${sanitized_second}"
+
+    # Clean up temp file
+    rm -f "$temp_file"
+    trap - EXIT
+
     return 1
 }
 
@@ -189,7 +218,7 @@ main() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
             -o|--output)
-                if [[ -z "$2" || "$2" == -* ]]; then
+                if [[ -z "${2:-}" ]]; then
                     msg_error "Option -o requires an argument"
                     exit 1
                 fi
