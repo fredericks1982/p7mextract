@@ -14,7 +14,7 @@ A bash utility to extract content from digitally signed `.p7m` files (PKCS#7 for
 
 ### Using make (recommended)
 
-The easiest way to install p7mextract is via `make install`, which copies the script to `~/.local/bin/` and makes it executable:
+The easiest way to install p7mextract is via `make install`, which copies the script to `~/.local/bin/`, makes it executable, and automatically adds `~/.local/bin` to your `PATH` if needed (by appending to `~/.zshrc` or `~/.bashrc`):
 
 ```bash
 make install
@@ -31,9 +31,9 @@ cp p7mextract ~/.local/bin/
 chmod +x ~/.local/bin/p7mextract
 ```
 
-### PATH configuration
+### PATH configuration (manual installation only)
 
-Ensure `~/.local/bin` is in your `PATH`. If it is not, add the following line to your `~/.zshrc` or `~/.bashrc`:
+If you used manual installation, ensure `~/.local/bin` is in your `PATH`. Add the following line to your `~/.zshrc` or `~/.bashrc`:
 
 ```bash
 export PATH="$HOME/.local/bin:$PATH"
