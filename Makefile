@@ -23,6 +23,19 @@ install:
 	@cp p7mextract ~/.local/bin/p7mextract
 	@chmod +x ~/.local/bin/p7mextract
 	@echo "✓ Installed to ~/.local/bin/p7mextract"
+	@if echo "$$PATH" | tr ':' '\n' | grep -qx "$$HOME/.local/bin"; then \
+		echo "✓ ~/.local/bin is already in your PATH"; \
+	else \
+		SHELL_NAME=$$(basename "$$SHELL"); \
+		if [ "$$SHELL_NAME" = "zsh" ]; then \
+			SHELL_RC="$$HOME/.zshrc"; \
+		else \
+			SHELL_RC="$$HOME/.bashrc"; \
+		fi; \
+		echo 'export PATH="$$HOME/.local/bin:$$PATH"' >> "$$SHELL_RC"; \
+		echo "✓ Added ~/.local/bin to PATH in $$SHELL_RC"; \
+		echo "  Restart your terminal or run: source $$SHELL_RC"; \
+	fi
 
 # Setup test fixtures
 fixtures:
