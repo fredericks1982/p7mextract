@@ -193,10 +193,13 @@ extract_p7m() {
         return 0
     fi
 
-    # Both formats failed - show errors
+    # Both formats failed - show errors (sanitize output: strip control chars, truncate)
+    local sanitized_first sanitized_second
+    sanitized_first="$(printf '%s' "$openssl_output_first" | tr -d '[:cntrl:]' | head -c 500)"
+    sanitized_second="$(printf '%s' "$openssl_output_second" | tr -d '[:cntrl:]' | head -c 500)"
     msg_error "Failed to extract file"
-    msg_error "${first_format} format error: ${openssl_output_first}"
-    msg_error "${second_format} format error: ${openssl_output_second}"
+    msg_error "${first_format} format error: ${sanitized_first}"
+    msg_error "${second_format} format error: ${sanitized_second}"
 
     # Clean up temp file
     rm -f "$temp_file"
@@ -215,7 +218,7 @@ main() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
             -o|--output)
-                if [[ -z "${2:-}" || "${2:-}" == -* ]]; then
+                if [[ -z "${2:-}" ]]; then
                     msg_error "Option -o requires an argument"
                     exit 1
                 fi
