@@ -20,18 +20,18 @@
 set -euo pipefail
 
 # Colors and formatting
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[0;33m'
-BLUE='\033[0;34m'
-BOLD='\033[1m'
-NC='\033[0m' # No Color
+readonly RED='\033[0;31m'
+readonly GREEN='\033[0;32m'
+readonly YELLOW='\033[0;33m'
+readonly BLUE='\033[0;34m'
+readonly BOLD='\033[1m'
+readonly NC='\033[0m' # No Color
 
 # Icons
-ICON_SUCCESS="✓"
-ICON_ERROR="✗"
-ICON_WARNING="⚠"
-ICON_PROMPT="❯"
+readonly ICON_SUCCESS="✓"
+readonly ICON_ERROR="✗"
+readonly ICON_WARNING="⚠"
+readonly ICON_PROMPT="❯"
 
 # Functions for colored output
 msg_success() {
