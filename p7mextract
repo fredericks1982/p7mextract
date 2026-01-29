@@ -338,7 +338,7 @@ main() {
     if extract_p7m "$input_file" "$output_file"; then
         local human_size
         human_size="$(get_human_size "$output_file")"
-        msg_success "Extracted to: ${BOLD}${output_file}${NC} (${human_size})"
+        printf '%b %b\n' "${GREEN}${ICON_SUCCESS}${NC}" "Extracted to: ${BOLD}${output_file}${NC} (${human_size})"
         exit 0
     else
         exit 1
