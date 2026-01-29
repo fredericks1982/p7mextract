@@ -153,29 +153,43 @@ extract_p7m() {
     local output_file="$2"
     local openssl_output_der
     local openssl_output_pem
-    
+
+    # Write to a temp file first, then move on success to avoid corrupting existing files
+    local output_dir
+    output_dir="$(dirname "$output_file")"
+    local temp_file
+    temp_file="$(mktemp "${output_dir}/.p7mextract.XXXXXX")"
+
+    # Ensure temp file is cleaned up on unexpected exit
+    trap 'rm -f "$temp_file"' EXIT
+
     # Try DER format first (silently)
-    openssl_output_der=$(openssl smime -verify -noverify -in "$input_file" -inform DER -out "$output_file" 2>&1)
-    
+    openssl_output_der=$(openssl smime -verify -noverify -in "$input_file" -inform DER -out "$temp_file" 2>&1)
+
     if [[ $? -eq 0 ]]; then
+        mv -f "$temp_file" "$output_file"
+        trap - EXIT
         return 0
     fi
-    
+
     # Fallback to PEM format (silently)
-    openssl_output_pem=$(openssl smime -verify -noverify -in "$input_file" -inform PEM -out "$output_file" 2>&1)
-    
+    openssl_output_pem=$(openssl smime -verify -noverify -in "$input_file" -inform PEM -out "$temp_file" 2>&1)
+
     if [[ $? -eq 0 ]]; then
+        mv -f "$temp_file" "$output_file"
+        trap - EXIT
         return 0
     fi
-    
+
     # Both formats failed - show errors
     msg_error "Failed to extract file"
     msg_error "DER format error: ${openssl_output_der}"
     msg_error "PEM format error: ${openssl_output_pem}"
-    
-    # Clean up partial output file if it exists
-    [[ -f "$output_file" ]] && rm -f "$output_file"
-    
+
+    # Clean up temp file
+    rm -f "$temp_file"
+    trap - EXIT
+
     return 1
 }
 
