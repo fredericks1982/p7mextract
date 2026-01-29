@@ -1,0 +1,24 @@
+name: Tests
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Bats and helpers
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bats
+          sudo git clone https://github.com/bats-core/bats-support /usr/local/lib/bats-support
+          sudo git clone https://github.com/bats-core/bats-assert /usr/local/lib/bats-assert
+          sudo git clone https://github.com/bats-core/bats-file /usr/local/lib/bats-file
+
+      - name: Run tests
+        run: make test
