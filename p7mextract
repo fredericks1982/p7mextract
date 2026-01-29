@@ -163,8 +163,18 @@ extract_p7m() {
     # Ensure temp file is cleaned up on unexpected exit
     trap 'rm -f "$temp_file"' EXIT
 
-    # Try DER format first (silently)
-    openssl_output_der=$(openssl smime -verify -noverify -in "$input_file" -inform DER -out "$temp_file" 2>&1)
+    # Detect likely PEM files to try the right format first
+    local first_format="DER"
+    local second_format="PEM"
+    if [[ "$(head -c 11 "$input_file")" == "-----BEGIN "* ]]; then
+        first_format="PEM"
+        second_format="DER"
+    fi
+
+    local openssl_output_first openssl_output_second
+
+    # Try first format (silently)
+    openssl_output_first=$(openssl smime -verify -noverify -in "$input_file" -inform "$first_format" -out "$temp_file" 2>&1)
 
     if [[ $? -eq 0 ]]; then
         mv -f "$temp_file" "$output_file"
@@ -172,8 +182,8 @@ extract_p7m() {
         return 0
     fi
 
-    # Fallback to PEM format (silently)
-    openssl_output_pem=$(openssl smime -verify -noverify -in "$input_file" -inform PEM -out "$temp_file" 2>&1)
+    # Fallback to second format (silently)
+    openssl_output_second=$(openssl smime -verify -noverify -in "$input_file" -inform "$second_format" -out "$temp_file" 2>&1)
 
     if [[ $? -eq 0 ]]; then
         mv -f "$temp_file" "$output_file"
@@ -183,8 +193,8 @@ extract_p7m() {
 
     # Both formats failed - show errors
     msg_error "Failed to extract file"
-    msg_error "DER format error: ${openssl_output_der}"
-    msg_error "PEM format error: ${openssl_output_pem}"
+    msg_error "${first_format} format error: ${openssl_output_first}"
+    msg_error "${second_format} format error: ${openssl_output_second}"
 
     # Clean up temp file
     rm -f "$temp_file"
