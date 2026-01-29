@@ -17,6 +17,8 @@
 # p7mextract - Extract content from digitally signed .p7m files
 # Usage: p7mextract [input.p7m] [-o output.file]
 
+set -euo pipefail
+
 # Colors and formatting
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -128,9 +130,9 @@ get_human_size() {
     local file_size
     
     if [[ "$(uname)" == "Darwin" ]]; then
-        file_size=$(stat -f%z "$file" 2>/dev/null)
+        file_size=$(stat -f%z "$file" 2>/dev/null) || true
     else
-        file_size=$(stat -c%s "$file" 2>/dev/null)
+        file_size=$(stat -c%s "$file" 2>/dev/null) || true
     fi
     
     if [[ -z "$file_size" ]]; then
@@ -174,18 +176,14 @@ extract_p7m() {
     local openssl_output_first openssl_output_second
 
     # Try first format (silently)
-    openssl_output_first=$(openssl smime -verify -noverify -in "$input_file" -inform "$first_format" -out "$temp_file" 2>&1)
-
-    if [[ $? -eq 0 ]]; then
+    if openssl_output_first=$(openssl smime -verify -noverify -in "$input_file" -inform "$first_format" -out "$temp_file" 2>&1); then
         mv -f "$temp_file" "$output_file"
         trap - EXIT
         return 0
     fi
 
     # Fallback to second format (silently)
-    openssl_output_second=$(openssl smime -verify -noverify -in "$input_file" -inform "$second_format" -out "$temp_file" 2>&1)
-
-    if [[ $? -eq 0 ]]; then
+    if openssl_output_second=$(openssl smime -verify -noverify -in "$input_file" -inform "$second_format" -out "$temp_file" 2>&1); then
         mv -f "$temp_file" "$output_file"
         trap - EXIT
         return 0
@@ -213,7 +211,7 @@ main() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
             -o|--output)
-                if [[ -z "$2" || "$2" == -* ]]; then
+                if [[ -z "${2:-}" || "${2:-}" == -* ]]; then
                     msg_error "Option -o requires an argument"
                     exit 1
                 fi
