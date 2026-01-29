@@ -24,12 +24,17 @@ FIXTURES_DIR="${HELPER_DIR}/fixtures"
 # Path to the script under test
 P7MEXTRACT="${PROJECT_DIR}/p7mextract"
 
-# Load bats helper libraries (installed via brew)
-# Support both Apple Silicon (/opt/homebrew) and Intel (/usr/local) Macs
+# Load bats helper libraries
+# Support Apple Silicon (/opt/homebrew), Intel Macs (/usr/local), and Linux (npm global)
 if [[ -d "/opt/homebrew/lib" ]]; then
     BATS_LIB_PATH="/opt/homebrew/lib"
-else
+elif [[ -d "/usr/local/lib/bats-support" ]]; then
     BATS_LIB_PATH="/usr/local/lib"
+elif [[ -d "/usr/lib/bats-support" ]]; then
+    BATS_LIB_PATH="/usr/lib"
+else
+    # npm global install location
+    BATS_LIB_PATH="$(npm root -g 2>/dev/null)"
 fi
 
 load "${BATS_LIB_PATH}/bats-support/load"
