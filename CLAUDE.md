@@ -33,6 +33,11 @@ Single executable script (`p7mextract`, ~300 lines) structured as:
 - `test/test_helper.bash` — shared setup (temp dirs, fixture paths, helper functions)
 - `test/fixtures/setup_fixtures.sh` — generates self-signed certs and signed sample files; auto-run by `make test`
 
+## Git Workflow
+
+- **Never push directly to `master`.** Always create a feature branch and open a pull request.
+- The `master` branch has protection rules requiring PRs and passing status checks.
+
 ## Platform Notes
 
 - macOS-specific: uses `stat -f%z` for file size and `bc` for formatting
