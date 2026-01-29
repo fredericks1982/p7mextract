@@ -147,7 +147,7 @@ get_human_size() {
     elif [[ $file_size -gt 1024 ]]; then
         local whole=$((file_size / 1024))
         local frac=$(( (file_size % 1024) * 10 / 1024 ))
-        echo "${whole}.${frac} KB"
+        echo "${whole}.${frac} kB"
     else
         echo "${file_size} bytes"
     fi
