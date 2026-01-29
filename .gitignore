@@ -9,7 +9,9 @@ test/fixtures/*.P7M
 # macOS
 .DS_Store
 
-# Editor
+# Editor / IDE
 *.swp
 *.swo
 *~
+.vscode/
+.claude/
