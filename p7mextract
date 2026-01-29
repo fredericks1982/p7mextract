@@ -147,7 +147,7 @@ get_human_size() {
     elif [[ $file_size -gt 1024 ]]; then
         local whole=$((file_size / 1024))
         local frac=$(( (file_size % 1024) * 10 / 1024 ))
-        echo "${whole}.${frac} KB"
+        echo "${whole}.${frac} kB"
     else
         echo "${file_size} bytes"
     fi
@@ -338,7 +338,7 @@ main() {
     if extract_p7m "$input_file" "$output_file"; then
         local human_size
         human_size="$(get_human_size "$output_file")"
-        msg_success "Extracted to: ${BOLD}${output_file}${NC} (${human_size})"
+        printf '%b %b\n' "${GREEN}${ICON_SUCCESS}${NC}" "Extracted to: ${BOLD}${output_file}${NC} (${human_size})"
         exit 0
     else
         exit 1
