@@ -141,9 +141,13 @@ get_human_size() {
     fi
     
     if [[ $file_size -gt 1048576 ]]; then
-        echo "$(echo "scale=1; $file_size/1048576" | bc) MB"
+        local whole=$((file_size / 1048576))
+        local frac=$(( (file_size % 1048576) * 10 / 1048576 ))
+        echo "${whole}.${frac} MB"
     elif [[ $file_size -gt 1024 ]]; then
-        echo "$(echo "scale=1; $file_size/1024" | bc) KB"
+        local whole=$((file_size / 1024))
+        local frac=$(( (file_size % 1024) * 10 / 1024 ))
+        echo "${whole}.${frac} KB"
     else
         echo "${file_size} bytes"
     fi
