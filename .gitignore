@@ -1,0 +1,15 @@
+# Generated test fixtures
+test/fixtures/*.pem
+test/fixtures/*.pdf
+test/fixtures/*.txt
+test/fixtures/*.xml
+test/fixtures/*.p7m
+test/fixtures/*.P7M
+
+# macOS
+.DS_Store
+
+# Editor
+*.swp
+*.swo
+*~

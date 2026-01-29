@@ -1,0 +1,302 @@
+#!/bin/bash
+
+# p7mextract - Extract content from digitally signed .p7m files
+# Usage: p7mextract [input.p7m] [-o output.file]
+
+# Colors and formatting
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+BOLD='\033[1m'
+NC='\033[0m' # No Color
+
+# Icons
+ICON_SUCCESS="✓"
+ICON_ERROR="✗"
+ICON_WARNING="⚠"
+ICON_PROMPT="❯"
+
+# Functions for colored output
+msg_success() {
+    echo -e "${GREEN}${ICON_SUCCESS}${NC} $1"
+}
+
+msg_error() {
+    echo -e "${RED}${ICON_ERROR}${NC} $1" >&2
+}
+
+msg_warning() {
+    echo -e "${YELLOW}${ICON_WARNING}${NC} $1"
+}
+
+msg_prompt() {
+    echo -e -n "${BLUE}${ICON_PROMPT}${NC} $1"
+}
+
+# Show usage
+show_usage() {
+    echo -e "${BOLD}Usage:${NC} p7mextract [input.p7m] [-o output.file]"
+    echo ""
+    echo "Extract content from digitally signed .p7m files."
+    echo ""
+    echo -e "${BOLD}Options:${NC}"
+    echo "  -o, --output FILE   Specify output file (relative or absolute path)"
+    echo "  -h, --help          Show this help message"
+    echo ""
+    echo -e "${BOLD}Examples:${NC}"
+    echo "  p7mextract document.pdf.p7m              # Output: document.pdf"
+    echo "  p7mextract document.p7m -o extracted.pdf # Output: extracted.pdf"
+    echo "  p7mextract                               # Interactive mode"
+}
+
+# Generate default output filename from input
+# myfile.ext.p7m -> myfile.ext
+# myfile.p7m -> myfile.pdf
+get_default_output() {
+    local input_file="$1"
+    local filename
+    filename="$(basename "$input_file")"
+    
+    # Remove .p7m extension (case insensitive check)
+    local lower_filename
+    lower_filename="$(echo "$filename" | tr '[:upper:]' '[:lower:]')"
+    
+    if [[ "$lower_filename" == *.p7m ]]; then
+        # Remove the .p7m extension (last 4 characters)
+        local without_p7m="${filename%.[pP]7[mM]}"
+        
+        # Check if there's still an extension
+        if [[ "$without_p7m" == *.* ]]; then
+            # Has an extension (e.g., myfile.pdf.p7m -> myfile.pdf)
+            echo "$without_p7m"
+        else
+            # No extension (e.g., myfile.p7m -> myfile.pdf)
+            echo "${without_p7m}.pdf"
+        fi
+    else
+        echo "${filename}.extracted"
+    fi
+}
+
+# Check if openssl is available
+check_dependencies() {
+    if ! command -v openssl &> /dev/null; then
+        msg_error "OpenSSL is not installed or not in PATH"
+        msg_error "Install it with: brew install openssl"
+        exit 1
+    fi
+}
+
+# Prompt for confirmation (default yes)
+confirm_overwrite() {
+    local file="$1"
+    local response
+    
+    msg_warning "File '${file}' already exists."
+    msg_prompt "Overwrite? [Y/n]: "
+    read -r response
+    
+    # Default to yes if empty, check for no
+    local lower_response
+    lower_response="$(echo "$response" | tr '[:upper:]' '[:lower:]')"
+    
+    if [[ -z "$response" ]] || [[ "$lower_response" == "y" ]] || [[ "$lower_response" == "yes" ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Get human readable file size
+get_human_size() {
+    local file="$1"
+    local file_size
+    
+    file_size=$(stat -f%z "$file" 2>/dev/null)
+    
+    if [[ -z "$file_size" ]]; then
+        echo "unknown size"
+        return
+    fi
+    
+    if [[ $file_size -gt 1048576 ]]; then
+        echo "$(echo "scale=1; $file_size/1048576" | bc) MB"
+    elif [[ $file_size -gt 1024 ]]; then
+        echo "$(echo "scale=1; $file_size/1024" | bc) KB"
+    else
+        echo "${file_size} bytes"
+    fi
+}
+
+# Extract the p7m file
+extract_p7m() {
+    local input_file="$1"
+    local output_file="$2"
+    local openssl_output_der
+    local openssl_output_pem
+    
+    # Try DER format first (silently)
+    openssl_output_der=$(openssl smime -verify -noverify -in "$input_file" -inform DER -out "$output_file" 2>&1)
+    
+    if [[ $? -eq 0 ]]; then
+        return 0
+    fi
+    
+    # Fallback to PEM format (silently)
+    openssl_output_pem=$(openssl smime -verify -noverify -in "$input_file" -inform PEM -out "$output_file" 2>&1)
+    
+    if [[ $? -eq 0 ]]; then
+        return 0
+    fi
+    
+    # Both formats failed - show errors
+    msg_error "Failed to extract file"
+    msg_error "DER format error: ${openssl_output_der}"
+    msg_error "PEM format error: ${openssl_output_pem}"
+    
+    # Clean up partial output file if it exists
+    [[ -f "$output_file" ]] && rm -f "$output_file"
+    
+    return 1
+}
+
+# Main script
+main() {
+    local input_file=""
+    local output_file=""
+    local output_specified=false
+    
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -o|--output)
+                if [[ -z "$2" || "$2" == -* ]]; then
+                    msg_error "Option -o requires an argument"
+                    exit 1
+                fi
+                output_file="$2"
+                output_specified=true
+                shift 2
+                ;;
+            -h|--help)
+                show_usage
+                exit 0
+                ;;
+            -*)
+                msg_error "Unknown option: $1"
+                show_usage
+                exit 1
+                ;;
+            *)
+                if [[ -z "$input_file" ]]; then
+                    input_file="$1"
+                else
+                    msg_error "Unexpected argument: $1"
+                    show_usage
+                    exit 1
+                fi
+                shift
+                ;;
+        esac
+    done
+    
+    # Check dependencies
+    check_dependencies
+    
+    # Interactive: prompt for input file if not provided
+    if [[ -z "$input_file" ]]; then
+        msg_prompt "Enter input .p7m file: "
+        read -r input_file
+        
+        if [[ -z "$input_file" ]]; then
+            msg_error "No input file specified"
+            exit 1
+        fi
+    fi
+    
+    # Expand tilde and resolve path
+    input_file="${input_file/#\~/$HOME}"
+    
+    # Validate input file exists
+    if [[ ! -f "$input_file" ]]; then
+        msg_error "Input file not found: ${input_file}"
+        exit 1
+    fi
+    
+    # Validate input file is readable
+    if [[ ! -r "$input_file" ]]; then
+        msg_error "Cannot read input file: ${input_file}"
+        exit 1
+    fi
+    
+    # Generate default output filename
+    local default_output
+    default_output="$(get_default_output "$input_file")"
+    
+    # If output has no directory, use input file's directory
+    if [[ "$default_output" != */* ]]; then
+        local input_dir
+        input_dir="$(dirname "$input_file")"
+        default_output="${input_dir}/${default_output}"
+    fi
+    
+    if [[ "$output_specified" == false ]]; then
+        msg_prompt "Output file [${default_output}]: "
+        read -r user_output
+        
+        if [[ -n "$user_output" ]]; then
+            output_file="$user_output"
+        else
+            output_file="$default_output"
+        fi
+    fi
+    
+    # Expand tilde in output path
+    output_file="${output_file/#\~/$HOME}"
+    
+    # Resolve relative path for output
+    if [[ "$output_file" != /* ]]; then
+        # If output is relative and has no directory component, use input's directory
+        if [[ "$output_file" != */* ]]; then
+            local input_dir
+            input_dir="$(dirname "$input_file")"
+            output_file="${input_dir}/${output_file}"
+        fi
+    fi
+    
+    # Check if output directory exists
+    local output_dir
+    output_dir="$(dirname "$output_file")"
+    if [[ ! -d "$output_dir" ]]; then
+        msg_error "Output directory does not exist: ${output_dir}"
+        exit 1
+    fi
+    
+    # Check if output directory is writable
+    if [[ ! -w "$output_dir" ]]; then
+        msg_error "Cannot write to output directory: ${output_dir}"
+        exit 1
+    fi
+    
+    # Check for overwrite
+    if [[ -f "$output_file" ]]; then
+        if ! confirm_overwrite "$output_file"; then
+            msg_warning "Operation cancelled"
+            exit 0
+        fi
+    fi
+    
+    # Perform extraction
+    if extract_p7m "$input_file" "$output_file"; then
+        local human_size
+        human_size="$(get_human_size "$output_file")"
+        msg_success "Extracted to: ${BOLD}${output_file}${NC} (${human_size})"
+        exit 0
+    else
+        exit 1
+    fi
+}
+
+# Run main function
+main "$@"
